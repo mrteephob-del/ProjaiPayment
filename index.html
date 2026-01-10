@@ -65,7 +65,7 @@
         // ==========================================
         // 🔹 นำ Web App URL จาก Google Script มาใส่ตรงนี้
         // ==========================================
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzFWLcPN2TW5qLyuD_H-N0yXo5h1psyXS0WuZtfTurBjDmDoyyqcBvgnqxaz1FKXoui/exec'; 
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby8G3WfyGr66mIkdZe0xG1bgYxREzkVPwBH08szcZRbdZ-1xxt849B1ELP_XsER3PBz/exec'; 
         // ==========================================
 
         const { useState, useEffect } = React;
@@ -181,20 +181,27 @@
 
             const confirmTransaction = async () => {
                 setIsLoading(true);
+                
                 const genderLabel = gender === 'male' ? 'ชาย' : 'หญิง';
                 const methodLabel = paymentMethod === 'scan' ? 'โอนจ่าย' : 'เงินสด';
-                const serviceNameTH = selectedService.name.th;
+                
+                // ดึงชื่อบริการ (ภาษาไทย) เพื่อบันทึก
+                const serviceNameTH = selectedService.name.th; 
                 
                 try {
                     await fetch(APPS_SCRIPT_URL, {
                         method: 'POST',
                         body: JSON.stringify({ 
                             amount: selectedService.price,
-                            gender: genderLabel,
-                            note: `บริการ: ${serviceNameTH} | จ่าย: ${methodLabel}`
+                            gender: genderLabel,          // ส่งเพศ
+                            service: serviceNameTH,       // ส่งชื่อบริการ (เพิ่มใหม่)
+                            paymentMethod: methodLabel,   // ส่งวิธีชำระ (เพิ่มใหม่)
+                            note: '-'                     // ไม่ใช้แล้ว แต่ใส่ไว้กัน Error ก็ได้
                         }),
                         mode: 'no-cors'
                     });
+
+                    // ... (ส่วนที่เหลือเหมือนเดิม) ...
 
                     setTimeout(() => {
                         setIsLoading(false);
