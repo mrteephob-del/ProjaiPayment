@@ -15,17 +15,25 @@
     <style>
         body { font-family: 'Sarabun', sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
         .bg-gradient-brand { background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%); }
-        .step-active { background-color: #0ea5e9; color: white; border-color: #0ea5e9; }
-        .step-inactive { background-color: #f3f4f6; color: #9ca3af; }
         
-        /* Keypad Animation */
-        .keypad-btn:active { transform: scale(0.95); background-color: #e5e7eb; }
-        
-        /* Custom Scrollbar */
+        /* Step Badge Style */
+        .step-badge {
+            background-color: #e0f2fe;
+            color: #0369a1;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+            display: inline-block;
+            margin-bottom: 0.5rem;
+            border: 1px solid #bae6fd;
+        }
+
         ::-webkit-scrollbar { width: 0px; background: transparent; }
     </style>
 </head>
-<body class="bg-gray-50 h-screen w-screen overflow-hidden">
+<body class="bg-slate-50 h-screen w-screen overflow-hidden">
 
     <div id="root" class="h-full w-full"></div>
 
@@ -34,15 +42,15 @@
 
         const { useState, useEffect } = React;
 
-        // ข้อมูลบริการ
+        // ข้อมูลบริการ (อัปเดตใหม่ตามที่ขอ)
         const SERVICE_DATA = {
             male: {
                 label: 'สุภาพบุรุษ',
                 icon: '👨',
                 color: 'blue',
                 options: [
-                    { price: 50, name: 'ตัดผม' },
-                    { price: 80, name: 'ตัด + สระ' }
+                    { price: 50, name: 'สระ (ผมสั้น)' },
+                    { price: 80, name: 'สระ (ผมยาว)' }
                 ]
             },
             female: {
@@ -50,21 +58,26 @@
                 icon: '👩',
                 color: 'pink',
                 options: [
-                    { price: 79, name: 'สระไดร์' },
-                    { price: 99, name: 'ตัดผม' },
-                    { price: 129, name: 'ตัด + สระไดร์' }
+                    { price: 79, name: 'สระ (ยาวปกติ)' },
+                    { price: 99, name: 'สระ (ผมยาว)' },
+                    { price: 129, name: 'สระ (ผมต่อ/เปีย/ทำเคมี)' }
                 ]
             }
         };
 
         function App() {
-            // State ควบคุมขั้นตอน (0=Gender, 1=Price, 2=Phone, 3=PaymentMethod, 4=Process/QR, 5=Success)
+            // State ขั้นตอน: 
+            // 0=Gender 
+            // 1=Price 
+            // 2=PaymentMethod 
+            // 3=Confirm/QR 
+            // 4=Success
             const [step, setStep] = useState(0);
+            const totalSteps = 4; // ไม่นับหน้า Success
             
             // Data States
             const [gender, setGender] = useState(null);
             const [selectedService, setSelectedService] = useState(null);
-            const [phoneNumber, setPhoneNumber] = useState('');
             const [paymentMethod, setPaymentMethod] = useState(null); // 'scan' | 'cash'
             const [isLoading, setIsLoading] = useState(false);
 
@@ -77,21 +90,14 @@
 
             const handlePriceSelect = (service) => {
                 setSelectedService(service);
-                setStep(2);
+                setStep(2); // ข้ามไปหน้าเลือกวิธีชำระเลย (ตัดหน้าเบอร์โทรออก)
             };
-
-            // Keypad Logic
-            const handlePhoneInput = (num) => {
-                if (phoneNumber.length < 10) setPhoneNumber(prev => prev + num);
-            };
-            const handlePhoneDelete = () => setPhoneNumber(prev => prev.slice(0, -1));
             
             const handlePaymentMethod = (method) => {
                 setPaymentMethod(method);
-                setStep(4); // ไปหน้า Confirm/QR
+                setStep(3); // ไปหน้า Confirm/QR
             };
 
-            // ฟังก์ชันบันทึกข้อมูล (กด "ยืนยันการจ่าย" หรือ "จ่ายเงินสดเรียบร้อย")
             const confirmTransaction = async () => {
                 setIsLoading(true);
                 
@@ -99,26 +105,19 @@
                 const methodLabel = paymentMethod === 'scan' ? 'โอนจ่าย' : 'เงินสด';
                 
                 try {
-                    // 1. ส่งข้อมูลเข้า Google Sheet
                     await fetch(APPS_SCRIPT_URL, {
                         method: 'POST',
                         body: JSON.stringify({ 
                             amount: selectedService.price,
                             gender: genderLabel,
-                            note: `บริการ: ${selectedService.name} | โทร: ${phoneNumber || '-'} | จ่าย: ${methodLabel}`
+                            note: `บริการ: ${selectedService.name} | จ่าย: ${methodLabel}`
                         }),
                         mode: 'no-cors'
                     });
 
-                    // 2. จำลองการส่ง SMS (ถ้ามี API SMS จริง ให้ยิงตรงนี้)
-                    if(phoneNumber.length === 10) {
-                        console.log(`Sending SMS to ${phoneNumber}: ขอบคุณที่ใช้บริการ ยอด ${selectedService.price} บาท`);
-                    }
-
-                    // 3. ไปหน้าจบ
                     setTimeout(() => {
                         setIsLoading(false);
-                        setStep(5); // Success Screen
+                        setStep(4); // Success Screen
                     }, 1500);
 
                 } catch (error) {
@@ -127,170 +126,159 @@
                 }
             };
 
-            // Reset กลับหน้าแรก
             const resetSystem = () => {
                 setStep(0);
                 setGender(null);
                 setSelectedService(null);
-                setPhoneNumber('');
                 setPaymentMethod(null);
             };
 
-            // Auto Reset หน้า Success
             useEffect(() => {
-                if (step === 5) {
-                    const timer = setTimeout(resetSystem, 5000); // 5 วินาทีกลับหน้าแรก
+                if (step === 4) {
+                    const timer = setTimeout(resetSystem, 5000); 
                     return () => clearTimeout(timer);
                 }
             }, [step]);
 
-            // --- UI Components ---
-
             return (
                 <div className="h-full flex flex-col bg-slate-50 relative">
                     
-                    {/* Header / Progress */}
-                    <header className="bg-white shadow-sm p-4 z-10">
-                        <div className="flex justify-between items-center mb-4">
-                            <h1 className="text-xl font-bold text-gray-700 flex items-center gap-2">
+                    {/* Header */}
+                    <header className="bg-white shadow-sm px-4 py-3 z-10 flex-none">
+                        <div className="flex justify-between items-center">
+                            <h1 className="text-lg font-bold text-gray-700 flex items-center gap-2">
                                 <span className="text-2xl">💇‍♀️</span> ร้านพอใจ สระด่วน
                             </h1>
-                            {step > 0 && step < 5 && (
-                                <button onClick={() => setStep(step - 1)} className="text-gray-400 font-medium px-3 py-1 bg-gray-100 rounded-lg">
-                                    &larr; ย้อนกลับ
+                            {step > 0 && step < 4 && (
+                                <button onClick={() => setStep(step - 1)} className="text-sm text-gray-500 hover:text-gray-800 font-medium px-3 py-1 bg-gray-100 rounded-full flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                                    ย้อนกลับ
                                 </button>
                             )}
                         </div>
-                        {/* Progress Bar */}
-                        <div className="flex gap-2 h-1.5">
-                            {[0, 1, 2, 3, 4].map(i => (
-                                <div key={i} className={`flex-1 rounded-full transition-all duration-300 ${i <= step ? 'bg-blue-500' : 'bg-gray-200'}`}></div>
-                            ))}
-                        </div>
+                        {/* Progress Indicator */}
+                        {step < 4 && (
+                            <div className="mt-3 flex items-center gap-1">
+                                {[...Array(totalSteps)].map((_, i) => (
+                                    <div key={i} className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${i <= step ? 'bg-blue-500' : 'bg-gray-200'}`}></div>
+                                ))}
+                            </div>
+                        )}
                     </header>
 
                     <main className="flex-grow flex flex-col items-center justify-center p-4 relative overflow-y-auto">
                         
-                        {/* STEP 0: Select Gender */}
+                        {/* STEP 1: Select Gender */}
                         {step === 0 && (
                             <div className="w-full max-w-2xl animate-fade-in text-center">
-                                <h2 className="text-2xl font-bold text-gray-700 mb-8">กรุณาเลือกประเภทลูกค้า</h2>
+                                <div className="step-badge">STEP 1</div>
+                                <h2 className="text-2xl font-bold text-gray-800 mb-8">เลือกประเภทลูกค้า</h2>
+                                
                                 <div className="grid grid-cols-2 gap-6">
-                                    <button onClick={() => handleGenderSelect('male')} className="bg-white border-2 border-blue-100 hover:border-blue-500 p-8 rounded-3xl shadow-lg hover:shadow-xl transition-all group">
-                                        <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">👨</div>
+                                    <button onClick={() => handleGenderSelect('male')} className="bg-white border-b-4 border-blue-100 hover:border-blue-500 p-8 rounded-3xl shadow-lg hover:shadow-xl transition-all group active:scale-95">
+                                        <div className="text-7xl mb-4 group-hover:scale-110 transition-transform">👨</div>
                                         <div className="text-2xl font-bold text-blue-600">ผู้ชาย</div>
                                     </button>
-                                    <button onClick={() => handleGenderSelect('female')} className="bg-white border-2 border-pink-100 hover:border-pink-500 p-8 rounded-3xl shadow-lg hover:shadow-xl transition-all group">
-                                        <div className="text-6xl mb-4 group-hover:scale-110 transition-transform">👩</div>
+                                    <button onClick={() => handleGenderSelect('female')} className="bg-white border-b-4 border-pink-100 hover:border-pink-500 p-8 rounded-3xl shadow-lg hover:shadow-xl transition-all group active:scale-95">
+                                        <div className="text-7xl mb-4 group-hover:scale-110 transition-transform">👩</div>
                                         <div className="text-2xl font-bold text-pink-600">ผู้หญิง</div>
                                     </button>
                                 </div>
                             </div>
                         )}
 
-                        {/* STEP 1: Select Service */}
+                        {/* STEP 2: Select Service */}
                         {step === 1 && (
-                            <div className="w-full max-w-2xl animate-fade-in">
-                                <h2 className="text-2xl font-bold text-gray-700 mb-6 text-center">
+                            <div className="w-full max-w-lg animate-fade-in text-center">
+                                <div className="step-badge">STEP 2</div>
+                                <h2 className="text-2xl font-bold text-gray-800 mb-6">
                                     เลือกบริการ ({gender === 'male' ? 'ชาย' : 'หญิง'})
                                 </h2>
+                                
                                 <div className="grid grid-cols-1 gap-4">
                                     {SERVICE_DATA[gender].options.map((option, idx) => (
                                         <button 
                                             key={idx} 
                                             onClick={() => handlePriceSelect(option)}
-                                            className="bg-white p-6 rounded-2xl shadow-md border-2 border-transparent hover:border-blue-400 flex justify-between items-center transition-all hover:scale-[1.02]"
+                                            className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:border-blue-400 hover:shadow-md flex justify-between items-center transition-all active:scale-[0.98]"
                                         >
-                                            <span className="text-xl text-gray-700 font-medium">{option.name}</span>
-                                            <span className="text-3xl font-bold text-blue-600">฿{option.price}</span>
+                                            <div className="text-left">
+                                                <span className="text-lg text-gray-700 font-bold block">{option.name}</span>
+                                                {/* เพิ่มคำอธิบายเพิ่มเติมถ้าชื่อยาว */}
+                                                {option.name.includes('ต่อผม') && <span className="text-xs text-gray-400">รวมเปียผม / ผมหนาพิเศษ</span>}
+                                            </div>
+                                            <span className="text-2xl font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-xl min-w-[90px] text-center">
+                                                {option.price}.-
+                                            </span>
                                         </button>
                                     ))}
                                 </div>
-                            </div>
-                        )}
-
-                        {/* STEP 2: Phone Number (Optional) */}
-                        {step === 2 && (
-                            <div className="w-full max-w-md animate-fade-in flex flex-col h-full justify-center">
-                                <h2 className="text-xl font-bold text-gray-700 mb-2 text-center">เบอร์โทรศัพท์ (สะสมแต้ม/รับใบเสร็จ)</h2>
-                                <p className="text-center text-gray-400 text-sm mb-4">*กดข้ามได้หากไม่ต้องการระบุ</p>
-                                
-                                <div className="bg-gray-100 rounded-2xl p-4 mb-6 text-center">
-                                    <span className="text-3xl font-mono tracking-widest text-gray-800 h-10 block">
-                                        {phoneNumber || <span className="text-gray-300">0XX-XXX-XXXX</span>}
-                                    </span>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-3 mb-6">
-                                    {[1,2,3,4,5,6,7,8,9].map(n => (
-                                        <button key={n} onClick={() => handlePhoneInput(n.toString())} className="keypad-btn bg-white shadow rounded-xl py-4 text-2xl font-bold text-gray-600">
-                                            {n}
-                                        </button>
-                                    ))}
-                                    <button onClick={() => setPhoneNumber('')} className="keypad-btn bg-red-50 text-red-500 rounded-xl py-4 font-bold">C</button>
-                                    <button onClick={() => handlePhoneInput('0')} className="keypad-btn bg-white shadow rounded-xl py-4 text-2xl font-bold text-gray-600">0</button>
-                                    <button onClick={handlePhoneDelete} className="keypad-btn bg-white shadow rounded-xl py-4 flex items-center justify-center">
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
-                                    </button>
-                                </div>
-
-                                <button onClick={() => setStep(3)} className="w-full bg-blue-600 text-white py-4 rounded-xl text-xl font-bold shadow-lg active:scale-95 transition-transform">
-                                    {phoneNumber ? 'ยืนยันเบอร์โทร' : 'ข้ามขั้นตอนนี้'}
-                                </button>
                             </div>
                         )}
 
                         {/* STEP 3: Payment Method */}
-                        {step === 3 && (
-                            <div className="w-full max-w-2xl animate-fade-in text-center">
-                                <h2 className="text-2xl font-bold text-gray-700 mb-2">สรุปยอดชำระ</h2>
-                                <p className="text-5xl font-bold text-blue-600 mb-8">฿{selectedService.price}</p>
-                                
-                                <p className="text-gray-500 mb-6">กรุณาเลือกช่องทางการชำระเงิน</p>
+                        {step === 2 && (
+                            <div className="w-full max-w-lg animate-fade-in text-center">
+                                <div className="step-badge">STEP 3</div>
+                                <h2 className="text-2xl font-bold text-gray-800 mb-2">สรุปยอดที่ต้องชำระ</h2>
+                                <div className="text-6xl font-bold text-blue-600 mb-2 tracking-tighter">฿{selectedService.price}</div>
+                                <div className="text-gray-500 mb-8 bg-gray-100 inline-block px-4 py-1 rounded-full text-sm">
+                                    {selectedService.name}
+                                </div>
+
+                                <h3 className="text-gray-700 font-bold mb-4 text-lg">เลือกช่องทางการชำระเงิน</h3>
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    <button onClick={() => handlePaymentMethod('scan')} className="bg-white border-2 border-blue-500 text-blue-600 p-6 rounded-2xl shadow-md hover:bg-blue-50 active:scale-95 transition-all">
+                                    <button onClick={() => handlePaymentMethod('scan')} className="bg-white border-2 border-blue-500 text-blue-600 p-6 rounded-2xl shadow-sm hover:bg-blue-50 active:scale-95 transition-all">
                                         <div className="text-4xl mb-2">📲</div>
                                         <div className="font-bold text-lg">สแกนจ่าย</div>
-                                        <div className="text-xs text-gray-400">PromptPay / QR</div>
+                                        <div className="text-xs text-gray-400">QR PromptPay</div>
                                     </button>
                                     
-                                    <button onClick={() => handlePaymentMethod('cash')} className="bg-white border-2 border-green-500 text-green-600 p-6 rounded-2xl shadow-md hover:bg-green-50 active:scale-95 transition-all">
+                                    <button onClick={() => handlePaymentMethod('cash')} className="bg-white border-2 border-green-500 text-green-600 p-6 rounded-2xl shadow-sm hover:bg-green-50 active:scale-95 transition-all">
                                         <div className="text-4xl mb-2">💵</div>
                                         <div className="font-bold text-lg">เงินสด</div>
-                                        <div className="text-xs text-gray-400">จ่ายที่เคาน์เตอร์/ใส่กล่อง</div>
+                                        <div className="text-xs text-gray-400">จ่ายกับพนักงาน</div>
                                     </button>
                                 </div>
                             </div>
                         )}
 
                         {/* STEP 4: Action (Scan or Cash Instruction) */}
-                        {step === 4 && (
-                            <div className="w-full max-w-sm animate-fade-in text-center bg-white p-6 rounded-3xl shadow-xl">
+                        {step === 3 && (
+                            <div className="w-full max-w-sm animate-fade-in text-center bg-white p-6 rounded-3xl shadow-xl border border-gray-100">
+                                <div className="step-badge mb-4">STEP 4</div>
                                 
-                                <h3 className="text-gray-500 mb-2">ยอดชำระ</h3>
-                                <p className="text-4xl font-bold text-blue-600 mb-6">฿{selectedService.price}</p>
-
                                 {paymentMethod === 'scan' ? (
                                     <>
-                                        <div className="bg-white p-2 border border-gray-200 rounded-xl inline-block mb-4">
+                                        <h3 className="text-gray-800 font-bold text-xl mb-1">สแกน QR Code</h3>
+                                        <p className="text-gray-400 text-sm mb-4">เพื่อชำระเงินเข้าบัญชีร้าน</p>
+                                        
+                                        <div className="bg-white p-2 border-2 border-dashed border-gray-300 rounded-xl inline-block mb-4 relative">
+                                            <div className="absolute -top-3 -right-3 bg-blue-500 text-white font-bold px-2 py-1 rounded-lg shadow-md text-sm">
+                                                ฿{selectedService.price}
+                                            </div>
                                             <img src={`https://promptpay.io/1220200002038/${selectedService.price}`} className="w-48 h-48 object-contain" alt="QR" />
                                         </div>
-                                        <p className="text-sm text-gray-400 mb-6">สแกนผ่านแอปธนาคารได้ทุกธนาคาร</p>
-                                        <button onClick={confirmTransaction} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold shadow-lg">
+                                        
+                                        <button onClick={confirmTransaction} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold shadow-lg transition-colors flex items-center justify-center gap-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
                                             ยืนยันการโอนเงิน
                                         </button>
                                     </>
                                 ) : (
                                     <>
-                                        <div className="py-8">
-                                            <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-5xl">
+                                        <div className="py-6">
+                                            <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-5xl animate-bounce">
                                                 🙏
                                             </div>
-                                            <p className="text-lg font-bold text-gray-700 mb-2">กรุณาชำระเงินที่พนักงาน</p>
-                                            <p className="text-sm text-gray-500">หรือใส่เงินในกล่องรับชำระ</p>
+                                            <p className="text-xl font-bold text-gray-800 mb-2">กรุณาชำระเงิน</p>
+                                            <p className="text-4xl font-bold text-green-600 mb-4">฿{selectedService.price}</p>
+                                            <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+                                                ยื่นเงินสดให้พนักงาน หรือ <br/>ใส่เงินในกล่องรับชำระ
+                                            </p>
                                         </div>
-                                        <button onClick={confirmTransaction} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold shadow-lg">
+                                        <button onClick={confirmTransaction} className="w-full bg-green-600 hover:bg-green-700 text-white py-3.5 rounded-xl font-bold shadow-lg transition-colors">
                                             ชำระเรียบร้อยแล้ว
                                         </button>
                                     </>
@@ -298,30 +286,22 @@
                             </div>
                         )}
 
-                        {/* STEP 5: Success / Thank You */}
-                        {step === 5 && (
+                        {/* FINAL: Success */}
+                        {step === 4 && (
                             <div className="w-full h-full flex flex-col items-center justify-center animate-scale-up text-center">
-                                <div className="w-32 h-32 bg-green-500 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-green-200">
-                                    <svg className="w-16 h-16 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                                <div className="w-28 h-28 bg-green-500 rounded-full flex items-center justify-center mb-6 shadow-green-200 shadow-xl">
+                                    <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
                                 </div>
                                 <h2 className="text-3xl font-bold text-gray-800 mb-2">ขอบคุณที่ใช้บริการ</h2>
-                                <p className="text-gray-500 text-lg">รายการของคุณถูกบันทึกเรียบร้อยแล้ว</p>
-                                {phoneNumber && <p className="text-sm text-blue-500 mt-2">ระบบส่งข้อมูลไปที่เบอร์: {phoneNumber}</p>}
+                                <p className="text-gray-500 text-lg">บันทึกรายการเรียบร้อยแล้วครับ</p>
                                 
-                                <div className="mt-8 w-full max-w-xs bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                                    <p className="text-xs text-gray-400 uppercase">Summary</p>
-                                    <div className="flex justify-between items-center mt-2 border-b pb-2">
-                                        <span className="text-gray-600">{selectedService?.name}</span>
-                                        <span className="font-bold">฿{selectedService?.price}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center mt-2">
-                                        <span className="text-xs text-gray-400">วิธีชำระ</span>
-                                        <span className="text-xs font-bold text-gray-500">{paymentMethod === 'scan' ? 'PromptPay' : 'Cash'}</span>
-                                    </div>
+                                <div className="mt-8">
+                                    <div className="animate-pulse bg-gray-200 h-1 w-32 mx-auto rounded-full"></div>
+                                    <p className="text-xs text-gray-400 mt-2">กำลังกลับสู่หน้าหลักอัตโนมัติ...</p>
                                 </div>
-                                
-                                <button onClick={resetSystem} className="mt-8 text-gray-400 hover:text-gray-600 underline text-sm">
-                                    กลับหน้าหลักทันที ({'5s'})
+
+                                <button onClick={resetSystem} className="mt-8 border border-gray-300 px-6 py-2 rounded-full text-gray-500 hover:bg-gray-50 text-sm">
+                                    กลับหน้าหลักทันที
                                 </button>
                             </div>
                         )}
